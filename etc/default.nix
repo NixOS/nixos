@@ -108,6 +108,7 @@ let
     }
 
     { # Script executed when the shell starts as a non-login shell (system-wide version).
+      # (bash) sync with zsh version
       source = pkgs.substituteAll {
         src = ./bashrc.sh;
         inherit systemPath wrapperDir modulesTree nssModulesPath;
@@ -116,7 +117,20 @@ let
         defaultLocale = config.i18n.defaultLocale;
         inherit nixEnvVars;
       };
-      target = "bashrc";      
+      target = "bashrc";
+    }
+
+    { # Script executed when the zsh shell starts as a non-login shell (system-wide version).
+      # (zsh) sync with bash version
+      source = pkgs.substituteAll {
+        src = ./zshenv;
+        inherit systemPath wrapperDir modulesTree nssModulesPath;
+        inherit (pkgs) glibc;
+        timeZone = config.time.timeZone;
+        defaultLocale = config.i18n.defaultLocale;
+        inherit nixEnvVars shellInit;
+      };
+      target = "zshenv";
     }
 
     { # Script executed when the shell starts as a login shell.

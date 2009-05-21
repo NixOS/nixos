@@ -1,5 +1,5 @@
 # Initialise a bunch of environment variables.
-# sync with zshenv
+# sync with bashrc.sh
 export PATH=/var/run/current-system/sw/bin:/var/run/current-system/sw/sbin
 export LD_LIBRARY_PATH=/var/run/opengl-driver/lib
 if test -n "@nssModulesPath@"; then
@@ -16,9 +16,8 @@ export LANG=@defaultLocale@
 export EDITOR=nano
 export INFOPATH=/var/run/current-system/sw/info:/var/run/current-system/sw/share/info
 export LOCATE_PATH=/var/cache/locatedb
-export KDEDIRS=/var/run/current-system/sw
-export XDG_CONFIG_DIRS=/var/run/current-system/sw/etc/xdg
-export XDG_DATA_DIRS=/var/run/current-system/sw/share
+@shellInit@
+export LOCALE_ARCHIVE=/var/run/current-system/sw/lib/locale/locale-archive
 
 # Set up secure multi-user builds: non-root users build through the
 # Nix daemon.
@@ -44,12 +43,14 @@ for i in $NIX_PROFILES; do # !!! reverse
     export PKG_CONFIG_PATH="$i/lib/pkgconfig:$PKG_CONFIG_PATH"
 
     # Automake's `aclocal' bails out if it finds non-existent directories
-    # in its path.  !!! We should fix aclocal instead.
-    if [ -d "$i/share/aclocal" ]
-    then
-	export ACLOCAL_PATH="$i/share/aclocal:$ACLOCAL_PATH"
+    # in its path.  !!! This has been fixed in the stdenv branch.
+    if [ -d "$i/share/aclocal" ]; then
+        export ACLOCAL_PATH="$i/share/aclocal:$ACLOCAL_PATH"
     fi
-    export PERL5LIB="$i/lib/site_perl:$PERL5LIB"
+
+    # "lib/site_perl" is for backwards compatibility with packages
+    # from Nixpkgs <= 0.12.
+    export PERL5LIB="$i/lib/perl5/site_perl:$i/lib/site_perl:$PERL5LIB"
 
     # GStreamer.
     export GST_PLUGIN_PATH="$i/lib/gstreamer-0.10:$GST_PLUGIN_PATH"
