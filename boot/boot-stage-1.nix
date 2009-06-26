@@ -75,6 +75,9 @@ rec {
       cp ${pkgs.bash}/bin/bash $out/bin
       ln -s bash $out/bin/sh
 
+      # Copy insmod.
+      cp ${pkgs.module_init_tools}/sbin/insmod $out/bin
+      
       # Run patchelf to make the programs refer to the copied libraries.
       for i in $out/bin/* $out/lib/*; do if ! test -L $i; then nuke-refs $i; fi; done
 
@@ -102,6 +105,7 @@ rec {
       fi
       $out/bin/reiserfsck -V
       $out/bin/mdadm --version
+      $out/bin/insmod --version
     ''; # */
   
 
