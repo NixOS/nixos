@@ -7,24 +7,20 @@ rec {
 
   configComponents = [
     configuration
-    (import ./options.nix)
+    ./options.nix
   ];
-
-  noOption = name: values:
-    abort "${name}: Used without option declaration.";
 
   # Make a configuration object from which we can retrieve option
   # values.
   config =
-    pkgs.lib.fixOptionSets
-      pkgs.lib.mergeOptionSets
-      {inherit pkgs;} configComponents;
+    pkgs.lib.definitionsOf configComponents {
+      inherit pkgs;
+    };
 
   optionDeclarations =
-    pkgs.lib.fixOptionSetsFun
-      pkgs.lib.filterOptionSets
-      {inherit pkgs;} configComponents
-      config;
+    pkgs.lib.fixableDeclarationsOf configComponents {
+      inherit pkgs;
+    } config;
 
   pkgs = import nixpkgs {system = platform;};
 
