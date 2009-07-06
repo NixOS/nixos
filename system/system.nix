@@ -18,12 +18,12 @@ rec {
   config =
     pkgs.lib.fixOptionSets
       pkgs.lib.mergeOptionSets
-      pkgs configComponents;
+      {inherit pkgs;} configComponents;
 
   optionDeclarations =
     pkgs.lib.fixOptionSetsFun
       pkgs.lib.filterOptionSets
-      pkgs configComponents
+      {inherit pkgs;} configComponents
       config;
 
   pkgs = import nixpkgs {system = platform;};
