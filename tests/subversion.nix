@@ -53,16 +53,15 @@ rec {
 
         {
           services.httpd.enable = true;
-          services.httpd.adminAddr = "e.dolstra@tudelft.nl";
-          services.httpd.extraSubservices =
-            [ { serviceType = "subversion";
-                configuration = {
-                  urlPrefix = "";
-                  dataDir = "/data/subversion";
-                  userCreationDomain = "192.168.0.0/16";
-                };
-              }
-            ];
+          services.httpd.hosts.main = {
+            adminAddr = "e.dolstra@tudelft.nl";
+            subversion = {
+              enable = true;
+              urlPrefix = "";
+              dataDir = "/data/subversion";
+              userCreationDomain = "192.168.0.0/16";
+            };
+          };
           nixpkgs.config.packageOverrides = overrides;
         };
 
