@@ -395,16 +395,16 @@ let
 
     };
 
-    config = {
-      robotsEntries = with handleSubversion config; ''
+    config = mkIf config.subversion.enable {
+      robotsEntries = with handleSubversion config; mkFixStrictness ''
         User-agent: *
         Disallow: ${urlPrefix}/viewcvs/
         Disallow: ${urlPrefix}/viewvc/
         Disallow: ${urlPrefix}/websvn/
         Disallow: ${urlPrefix}/repos-xml/
-      '';  
+      '';
 
-      extraConfig = with handleSubversion config; ''
+      extraConfig = with handleSubversion config; mkFixStrictness ''
 
         <Location ${urlPrefix}/repos>
           ${reposConfig "repos"}
