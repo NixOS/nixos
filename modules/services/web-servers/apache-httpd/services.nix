@@ -13,42 +13,42 @@ let
 
       extraConfig = mkOption {
         default = "";
-        description = "Not documented yet.";
+        description = "see host config.";
       };
 
       extraModules = mkOption {
         default = [];
-        description = "Not documented yet.";
+        description = "see services.httpd.extraModules";
       };
 
       extraModulesPre = mkOption {
         default = [];
-        description = "Not documented yet.";
+        description = "see services.httpd.extraModulesPre";
       };
 
       extraPath = mkOption {
         default = [];
-        description = "Not documented yet.";
+        description = "see environment.systemPackages";
       };
 
       extraServerPath = mkOption {
         default = [];
-        description = "Not documented yet.";
+        description = "see jobs.httpd.environment.PATH";
       };
 
       globalEnvVars = mkOption {
         default = [];
-        description = "Not documented yet.";
+        description = "see jobs.httpd.environment";
       };
 
       robotsEntries = mkOption {
         default = "";
-        description = "Not documented yet.";
+        description = "see host robotEntries.";
       };
 
       startupScript = mkOption {
         default = "";
-        description = "Not documented yet.";
+        description = "see jobs.httpd.preStart";
       };
 
 

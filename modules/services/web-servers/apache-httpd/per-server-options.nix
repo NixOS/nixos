@@ -5,16 +5,130 @@
 
 {options, config, pkgs, ...}:
 
+with pkgs.lib;
+
 let
-  inherit (pkgs.lib) mkOption addDefaultOptionValues types;
+  httpd = config.services.httpd;
+  mainHost = httpd.hosts.main;
+  allHosts = attrValues httpd.hosts;
 
-  mainServerArgs = {
-    config = config.services.httpd;
-    options = options.services.httpd;
-  };
+  enableSSL = any (vhost: vhost.enableSSL) allHosts;
 
 
-  perServerOptions = {forMainServer}: {config, ...}: {
+  isMainServer = {name, ...}:
+    mainHost._args.name == name;
+
+  inheritAsDefault = {config, options, ...}: opt:
+    pkgs.lib.optionalAttrs
+      (pkgs.lib.getAttr opt options).isDefined
+      { default = pkgs.lib.getAttr opt config; };
+
+  inheritDefaultFromMainServer = this: opt:
+    pkgs.lib.optionalAttrs (! isMainServer this)
+      (inheritAsDefault mainHost._args opt);
+
+  perServerConfig = {name, config, ...}@args: let
+
+    subservices = config.extraSubservices;
+
+    documentRoot = if config.documentRoot != null then config.documentRoot else
+      pkgs.runCommand "empty" {} "ensureDir $out";
+
+    documentRootConf = ''
+      DocumentRoot "${documentRoot}"
+
+      <Directory "${documentRoot}">
+          Options Indexes FollowSymLinks
+          AllowOverride None
+          Order allow,deny
+          Allow from all
+      </Directory>
+    '';
+
+    robotsTxt = pkgs.writeText "robots.txt" config.robotsEntries;
+
+    robotsConf = ''
+      Alias /robots.txt ${robotsTxt}
+    '';
+
+  in ''
+    ServerName ${config.canonicalName}
+
+    ${concatMapStrings (alias: "ServerAlias ${alias}\n") config.serverAliases}
+
+    ${if config.sslServerCert != "" then ''
+      SSLCertificateFile ${config.sslServerCert}
+      SSLCertificateKeyFile ${config.sslServerKey}
+    '' else ""}
+    
+    ${if config.enableSSL then ''
+      SSLEngine on
+    '' else if enableSSL then /* i.e., SSL is enabled for some host, but not this one */
+    ''
+      SSLEngine off
+    '' else ""}
+
+    ${if isMainServer args || config.adminAddr != "" then ''
+      ServerAdmin ${config.adminAddr}
+    '' else ""}
+
+    ${if !isMainServer args && httpd.logPerVirtualHost then ''
+      ErrorLog ${httpd.logDir}/error_log-${config.hostName}
+      CustomLog ${httpd.logDir}/access_log-${config.hostName} ${httpd.logFormat}
+    '' else ""}
+
+    ${robotsConf}
+
+    ${if isMainServer args || config.documentRoot != null then documentRootConf else ""}
+
+    ${if config.enableUserDir then ''
+    
+      UserDir public_html
+      UserDir disabled root
+      
+      <Directory "/home/*/public_html">
+          AllowOverride FileInfo AuthConfig Limit Indexes
+          Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
+          <Limit GET POST OPTIONS>
+              Order allow,deny
+              Allow from all
+          </Limit>
+          <LimitExcept GET POST OPTIONS>
+              Order deny,allow
+              Deny from all
+          </LimitExcept>
+      </Directory>
+      
+    '' else ""}
+
+    ${if config.globalRedirect != "" then ''
+      RedirectPermanent / ${config.globalRedirect}
+    '' else ""}
+
+    ${
+      let makeFileConf = elem: ''
+            Alias ${elem.urlPath} ${elem.file}
+          '';
+      in concatMapStrings makeFileConf config.servedFiles
+    }
+
+    ${
+      let makeDirConf = elem: ''
+            Alias ${elem.urlPath} ${elem.dir}/
+            <Directory ${elem.dir}>
+                Options +Indexes
+                Order allow,deny
+                Allow from all
+                AllowOverride All
+            </Directory>
+          '';
+      in concatMapStrings makeDirConf config.servedDirs
+    }
+
+    ${config.extraConfig}
+  '';
+
+  perServerOptions = {name, config, options, ...}@args: {
 
     hostName = mkOption {
       default = "localhost";
@@ -38,6 +152,17 @@ let
         Port for the server.  The default port depends on the
         <option>enableSSL</option> option of this server. (80 for http and
         443 for https).
+      ";
+    };
+
+    canonicalName = mkOption {
+      default = with pkgs.lib;
+        (if config.enableSSL then "https" else "http") + "://" +
+        config.hostName +
+        optionalString options.port.isDefined ":${toString config.port}";
+      type = with types; none string;
+      description = "
+        Canonical name of the host.
       ";
     };
 
@@ -73,7 +198,7 @@ let
       description = "
         E-mail address of the server administrator.
       ";
-    } // (if forMainServer then {} else {default = "";}));
+    } // inheritDefaultFromMainServer args "adminAddr");
 
     documentRoot = mkOption {
       default = null;
@@ -100,12 +225,30 @@ let
       default = [];
       example = [
         { urlPath = "/foo/bar.png";
-          dir = "/home/eelco/some-file.png";
+          file = "/home/eelco/some-file.png";
         }
       ];
       description = "
         This option provides a simple way to serve individual, static files.
       ";
+    };
+
+    robotsEntries = mkOption {
+      default = "";
+      type = with types; string;
+      description = "
+        List of rules located inside the robots.txt file which will appear
+        as being at the document root.  This option is useful for services
+        to restrict access to private directories.
+
+        All main host rules are append at the end of the rules defined for
+        this host except if this host is the main host.
+      ";
+      merge = pkgs.lib.concatStringsSep "\n";
+      apply = robotsEntries: ''
+        ${robotsEntries}
+        ${pkgs.lib.optionalString (!isMainServer args) mainHost.robotsEntries}
+      '';
     };
 
     extraConfig = mkOption {
@@ -139,11 +282,19 @@ let
       ";
     };
 
-  };
+    serverConfig = mkOption {
+      default = "";
+      description = "
+        If set, it overrides the default configuration computed from other
+        options.
+      ";
+      apply = conf:
+        if conf == "" then
+          perServerConfig args
+        else
+          conf;
+    };
 
-
-  vhostOptions = perServerOptions {
-    forMainServer = false;
   };
 
 in
@@ -152,31 +303,37 @@ in
   options = {
     services.httpd = {
 
-      virtualHosts = mkOption {
-        default = [];
-        example = [
-          { hostName = "foo";
+      hosts = mkOption {
+        default = {};
+        example = {
+          foo = {
+            hostName = "foo";
             documentRoot = "/data/webroot-foo";
-          }
-          { hostName = "bar";
+          };
+          bar = {
+            hostName = "bar";
             documentRoot = "/data/webroot-bar";
-          }
-        ];
-        type = with types; listOf optionSet;
+          };
+        };
+        type = with types; attrsOf optionSet;
         description = ''
-          Specification of the virtual hosts served by Apache.  Each
-          element should be an attribute set specifying the
-          configuration of the virtual host.  The available options
-          are the non-global options permissible for the main host.
+          Attribute set of hosts.  All hosts are virtual hosts except one
+          which should be referenced inside
+          <option>services.httpd.mainHosts</option> which is the main host.
         '';
 
-        options = [
-          vhostOptions
-        ];
+        options = [ perServerOptions ];
       };
 
-    }
-    // perServerOptions {forMainServer = true;} mainServerArgs
-    ;
+    };
+  };
+
+  config = {
+    services.httpd.extraModules = mkIf enableSSL [
+      "ssl"
+    ];
+
+    # Add the main server.
+    services.httpd.hosts.main = {};
   };
 }

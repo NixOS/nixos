@@ -185,10 +185,7 @@ in
       };
 
     services.httpd = mkIf cfg.enableWebInterface {
-      extraConfig = mkThenElse {
-        thenPart = extraHttpdConfig;
-        elsePart = "";
-      };
+      hosts.main.extraConfig = extraHttpdConfig;
     };
     
   };

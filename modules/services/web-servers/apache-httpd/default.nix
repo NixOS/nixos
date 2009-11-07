@@ -5,59 +5,28 @@ with pkgs.lib;
 let
 
   mainCfg = config.services.httpd;
-  
+  mainHost = mainCfg.hosts.main;
+  allHosts = attrValues mainCfg.hosts;
+
+  isMainServer = cfg: mainHost._args.name == cfg._args.name;
+  vhosts = filter (cfg: ! isMainServer cfg) allHosts;
+
+
   startingDependency = if config.services.gw6c.enable then "gw6c" else "network-interfaces";
 
   httpd = pkgs.apacheHttpd;
 
   getPort = cfg: cfg.port;
 
-  extraModules = attrByPath ["extraModules"] [] mainCfg;
-  extraForeignModules = filter builtins.isAttrs extraModules;
-  extraApacheModules = filter (x: !(builtins.isAttrs x)) extraModules; # I'd prefer using builtins.isString here, but doesn't exist yet
-
-  
+  # !!! keep it as a memo (dead code)
   makeServerInfo = cfg: {
-    # Canonical name must not include a trailing slash.
-    canonicalName =
-      (if cfg.enableSSL then "https" else "http") + "://" +
-      cfg.hostName +
-      (if getPort cfg != (if cfg.enableSSL then 443 else 80) then ":${toString (getPort cfg)}" else "");
-
-    # Admin address: inherit from the main server if not specified for
-    # a virtual host.
-    adminAddr = if cfg.adminAddr != "" then cfg.adminAddr else mainCfg.adminAddr;
+    inherit (cfg) canonicalName adminAddr;
 
     vhostConfig = cfg;
     serverConfig = mainCfg;
     fullConfig = config; # machine config
   };
 
-  vhosts = mainCfg.virtualHosts;
-
-  allHosts = [mainCfg] ++ vhosts;
-    
-  # !!! This should be replaced by sub-modules to allow non-intrusive
-  # extensions of NixOS.
-  callSubservices = serverInfo: defs:
-    let f = svc:
-      rec {
-        config =
-          if res ? options then
-            addDefaultOptionValues res.options svc.configuration
-          else
-            svc.configuration;
-        res = svc // svc.function {inherit config pkgs serverInfo servicesPath;};
-      }.res;
-    in map f defs;
-
-
-  # !!! callSubservices is expensive   
-  subservicesFor = cfg: callSubservices (makeServerInfo cfg) cfg.extraSubservices;
-
-  mainSubservices = subservicesFor mainCfg;
-
-  allSubservices = mainSubservices ++ concatMap subservicesFor vhosts;
 
 
   # !!! should be in lib
@@ -65,11 +34,8 @@ let
     pkgs.runCommand name {inherit text;} "ensureDir $out; echo -n \"$text\" > $out/$name";
 
 
-  enableSSL = any (vhost: vhost.enableSSL) allHosts;
-  
-
   # Names of modules from ${httpd}/modules that we want to load.
-  apacheModules = 
+  apacheModules =
     [ # HTTP authentication mechanisms: basic and digest.
       "auth_basic" "auth_digest"
 
@@ -85,8 +51,27 @@ let
       "mime" "dav" "status" "autoindex" "asis" "info" "cgi" "dav_fs"
       "vhost_alias" "negotiation" "dir" "imagemap" "actions" "speling"
       "userdir" "alias" "rewrite" "proxy" "proxy_http"
-    ] ++ optional enableSSL "ssl" ++ extraApacheModules;
-    
+    ];
+
+  # list of all modules which have to be loaded.
+  allModules =
+    let
+      httpdModule = name: {
+        inherit name;
+        path = "${httpd}/modules/mod_${name}.so";
+      };
+
+      convert = mod: with builtins;
+        if isAttrs mod then mod
+        else if isString mod then httpdModule mod
+        else throw "Bad module syntax.";
+    in
+      map convert (
+        mainCfg.extraModulesPre ++
+        apacheModules ++
+        mainCfg.extraModules
+      );
+
 
   loggingConf = ''
     ErrorLog ${mainCfg.logDir}/error_log
@@ -141,115 +126,7 @@ let
   '';
 
 
-  perServerConf = isMainServer: cfg: let
 
-    serverInfo = makeServerInfo cfg;
-
-    subservices = callSubservices serverInfo cfg.extraSubservices;
-
-    documentRoot = if cfg.documentRoot != null then cfg.documentRoot else
-      pkgs.runCommand "empty" {} "ensureDir $out";
-
-    documentRootConf = ''
-      DocumentRoot "${documentRoot}"
-
-      <Directory "${documentRoot}">
-          Options Indexes FollowSymLinks
-          AllowOverride None
-          Order allow,deny
-          Allow from all
-      </Directory>
-    '';
-
-    robotsTxt = pkgs.writeText "robots.txt" ''
-      ${# If this is a vhost, the include the entries for the main server as well.
-        if isMainServer then ""
-        else concatMapStrings (svc: svc.robotsEntries) mainSubservices}
-      ${concatMapStrings (svc: svc.robotsEntries) subservices}
-    '';
-
-    robotsConf = ''
-      Alias /robots.txt ${robotsTxt}
-    '';
-
-  in ''
-    ServerName ${serverInfo.canonicalName}
-
-    ${concatMapStrings (alias: "ServerAlias ${alias}\n") cfg.serverAliases}
-
-    ${if cfg.sslServerCert != "" then ''
-      SSLCertificateFile ${cfg.sslServerCert}
-      SSLCertificateKeyFile ${cfg.sslServerKey}
-    '' else ""}
-    
-    ${if cfg.enableSSL then ''
-      SSLEngine on
-    '' else if enableSSL then /* i.e., SSL is enabled for some host, but not this one */
-    ''
-      SSLEngine off
-    '' else ""}
-
-    ${if isMainServer || cfg.adminAddr != "" then ''
-      ServerAdmin ${cfg.adminAddr}
-    '' else ""}
-
-    ${if !isMainServer && mainCfg.logPerVirtualHost then ''
-      ErrorLog ${mainCfg.logDir}/error_log-${cfg.hostName}
-      CustomLog ${mainCfg.logDir}/access_log-${cfg.hostName} ${mainCfg.logFormat}
-    '' else ""}
-
-    ${robotsConf}
-
-    ${if isMainServer || cfg.documentRoot != null then documentRootConf else ""}
-
-    ${if cfg.enableUserDir then ''
-    
-      UserDir public_html
-      UserDir disabled root
-      
-      <Directory "/home/*/public_html">
-          AllowOverride FileInfo AuthConfig Limit Indexes
-          Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
-          <Limit GET POST OPTIONS>
-              Order allow,deny
-              Allow from all
-          </Limit>
-          <LimitExcept GET POST OPTIONS>
-              Order deny,allow
-              Deny from all
-          </LimitExcept>
-      </Directory>
-      
-    '' else ""}
-
-    ${if cfg.globalRedirect != "" then ''
-      RedirectPermanent / ${cfg.globalRedirect}
-    '' else ""}
-
-    ${
-      let makeFileConf = elem: ''
-            Alias ${elem.urlPath} ${elem.file}
-          '';
-      in concatMapStrings makeFileConf cfg.servedFiles
-    }
-
-    ${
-      let makeDirConf = elem: ''
-            Alias ${elem.urlPath} ${elem.dir}/
-            <Directory ${elem.dir}>
-                Options +Indexes
-                Order allow,deny
-                Allow from all
-                AllowOverride All
-            </Directory>
-          '';
-      in concatMapStrings makeDirConf cfg.servedDirs
-    }
-
-    ${concatMapStrings (svc: svc.extraConfig) subservices}
-
-    ${cfg.extraConfig}
-  '';
 
   
   httpdConf = pkgs.writeText "httpd.conf" ''
@@ -274,10 +151,6 @@ let
 
     ${let
         load = {name, path}: "LoadModule ${name}_module ${path}\n";
-        allModules =
-          concatMap (svc: svc.extraModulesPre) allSubservices ++
-          map (name: {inherit name; path = "${httpd}/modules/mod_${name}.so";}) apacheModules ++
-          concatMap (svc: svc.extraModules) allSubservices ++ extraForeignModules;
       in concatMapStrings load allModules
     }
 
@@ -297,7 +170,10 @@ let
     Include ${httpd}/conf/extra/httpd-multilang-errordoc.conf
     Include ${httpd}/conf/extra/httpd-languages.conf
     
-    ${if enableSSL then sslConf else ""}
+    ${# you cannot rely on hosts enableSSL because it can be bypass.
+      let hasMod = name: any (mod: name == mod.name); in
+      optionalString (hasMod "ssl" allModules) sslConf
+    }
 
     # Fascist default - deny access to everything.
     <Directory />
@@ -316,7 +192,7 @@ let
     </Directory>
 
     # Generate directives for the main server.
-    ${perServerConf true mainCfg}
+    ${mainHost.serverConfig}
     
     # Always enable virtual hosts; it doesn't seem to hurt.
     ${let
@@ -327,8 +203,8 @@ let
 
     ${let
         makeVirtualHost = vhost: ''
-          <VirtualHost *:${toString (getPort vhost)}>
-              ${perServerConf false vhost}
+          <VirtualHost *:${toString vhost.port}>
+              ${vhost.serverConfig}
           </VirtualHost>
         '';
       in concatMapStrings makeVirtualHost vhosts
@@ -354,14 +230,25 @@ in
         ";
       };
 
+      extraModulesPre = mkOption {
+        default = [];
+        description = ''
+          Specifies additional Apache modules which are loaded before Apache
+          modules.  These can be specified as a string in the case of
+          modules distributed with Apache, or as an attribute set specifying
+          the <varname>name</varname> and <varname>path</varname> of the
+          module (see <option>extraModules</option>).
+        '';
+      };
+
       extraModules = mkOption {
         default = [];
         example = [ "proxy_connect" { name = "php5"; path = "${pkgs.php}/modules/libphp5.so"; } ];
         description = ''
-          Specifies additional Apache modules.  These can be specified
-          as a string in the case of modules distributed with Apache,
-          or as an attribute set specifying the
-          <varname>name</varname> and <varname>path</varname> of the
+          Specifies additional Apache modules which are loaded after Apache
+          modules.  These can be specified as a string in the case of
+          modules distributed with Apache, or as an attribute set specifying
+          the <varname>name</varname> and <varname>path</varname> of the
           module.
         '';
       };
@@ -434,7 +321,7 @@ in
       { name = mainCfg.group;
       };
 
-    environment.systemPackages = [httpd] ++ concatMap (svc: svc.extraPath) allSubservices;
+    environment.systemPackages = [httpd];
 
     jobs.httpd =
       { # Statically verify the syntactic correctness of the generated
@@ -453,16 +340,16 @@ in
         startOn = "${startingDependency}/started";
         stopOn = "shutdown";
 
-        environment =
+        environment = mkHeader
           { # !!! This should be added in test-instrumentation.nix.  It
             # shouldn't hurt though, since packages usually aren't built
             # with coverage enabled.
            GCOV_PREFIX = "/tmp/coverage-data";
 
-           PATH = "${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin:${concatStringsSep ":" (concatMap (svc: svc.extraServerPath) allSubservices)}";
-          } // (listToAttrs (concatMap (svc: svc.globalEnvVars) allSubservices));
+           PATH = "${pkgs.coreutils}/bin:${pkgs.gnugrep}/bin";
+          };
 
-        preStart =
+        preStart = mkHeader
           ''
             mkdir -m 0700 -p ${mainCfg.stateDir}
             mkdir -m 0700 -p ${mainCfg.logDir}
@@ -472,12 +359,6 @@ in
             # succesfully.
             for i in $(${pkgs.utillinux}/bin/ipcs -s | grep ' ${mainCfg.user} ' | cut -f2 -d ' '); do
                 ${pkgs.utillinux}/bin/ipcrm -s $i
-            done
-
-            # Run the startup hooks for the subservices.
-            for i in ${toString (map (svn: svn.startupScript) allSubservices)}; do
-                echo Running Apache startup hook $i...
-                $i
             done
           '';
 
