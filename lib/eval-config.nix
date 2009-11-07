@@ -61,7 +61,9 @@ rec {
 
   # Optionally check wether all config values have corresponding
   # option declarations.
-  config = pkgs.checker optionDefinitions
-    optionDefinitions.environment.checkConfigurationOptions
-    options optionDefinitions;
+  config =
+    assert optionDefinitions.environment.checkConfigurationOptions
+        -> pkgs.lib.checkModule "" systemModule;
+    optionDefinitions;
+
 }
