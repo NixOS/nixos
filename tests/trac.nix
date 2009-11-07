@@ -45,8 +45,11 @@ rec {
       
         services.portmap.enable = true;
         services.httpd.enable = true;
-        services.httpd.adminAddr = "root@localhost";
-        services.httpd.extraSubservices = [ { serviceType = "trac"; } ];
+        services.httpd.hosts.main = {
+          adminAddr = "root@localhost";
+          trac.enable = true;
+        };
+        # setup a SVN repository & a Trac view
         environment.systemPackages = [ pkgs.pythonPackages.trac pkgs.subversion ];
       };
       
@@ -89,7 +92,7 @@ rec {
       $webserver->mustSucceed("mkdir -p /repos/trac");
       $webserver->mustSucceed("svnadmin create /repos/trac");
       
-      $webserver->waitForFile("/var/trac");      
+      $webserver->waitForFile("/var/trac");
       $webserver->mustSucceed("mkdir -p /var/trac/projects/test");
       $webserver->mustSucceed("PYTHONPATH=${pkgs.pythonPackages.psycopg2}/lib/python2.5/site-packages trac-admin /var/trac/projects/test initenv Test postgres://root\@postgresql/trac svn /repos/trac");
       
