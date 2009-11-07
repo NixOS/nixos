@@ -200,7 +200,7 @@ let
         };
 
         environment = mkOption {
-          type = types.attrs;
+          type = with types; attrsOf envVar;
           default = {};
           example = { PATH = "/foo/bar/bin"; LANG = "nl_NL.UTF-8"; };
           description = ''

@@ -161,7 +161,7 @@ in
       { startOn = "startup";
         stopOn = "shutdown";
 
-        environment = { UDEV_CONFIG_FILE = conf; };
+        environment = { UDEV_CONFIG_FILE = toString conf; };
 
         preStart =
           ''

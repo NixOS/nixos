@@ -195,7 +195,8 @@ in
          
           environment = mkOption {
             default = {};
-            example = { SLIM_CFGFILE = /etc/slim.conf; };
+            example = { SLIM_CFGFILE = "/etc/slim.conf"; };
+            type = with types; attrsOf envVar;
             description = "Additional environment variables needed by the display manager.";
           };
          

@@ -98,8 +98,8 @@ in
             rm -f /var/log/slim.log
           '';
         environment =
-          { SLIM_CFGFILE = slimConfig;
-            SLIM_THEMESDIR = slimThemesDir;
+          { SLIM_CFGFILE = toString slimConfig;
+            SLIM_THEMESDIR = toString slimThemesDir;
           };
         execCmd = "${pkgs.slim}/bin/slim";
       };
