@@ -1,4 +1,4 @@
-{ config, pkgs, serverInfo, ... }:
+{ config, pkgs, ... }:
 
 with pkgs.lib;
 
