@@ -96,6 +96,7 @@
   ./services/web-servers/apache-httpd/default.nix
   ./services/web-servers/apache-httpd/per-server-options.nix
   ./services/web-servers/apache-httpd/subversion.nix
+  ./services/web-servers/apache-httpd/tomcat.nix
   ./services/web-servers/apache-httpd/trac.nix
   ./services/web-servers/apache-httpd/twiki.nix
   ./services/web-servers/apache-httpd/zabbix.nix
