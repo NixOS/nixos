@@ -106,7 +106,7 @@ in
 
   config = mkIf (allHosts != []) {
 
-    jobs.httpd = {
+    jobs.httpd = {options, ...}: {
 
       environment.PYTHONPATH =
         "${pkgs.mod_python}/lib/python2.5/site-packages:" +
@@ -116,16 +116,13 @@ in
         "${pkgs.pythonPackages.psycopg2}/lib/python2.5/site-packages:" +
         "${subversion}/lib/python2.5/site-packages";
 
-      # Use preStart merge function instead of the usual copy&paste pattern.
-      preStart = ''
+      preStart = options.preStart.merge (foreachHost (config:  ''
         mkdir -p /var/trac
         chown ${config.trac.user}:${config.trac.group} /var/trac
 
-        ${concatMapStrings
-            (h: concatMapStrings createTracProject h.trac.projects)
-            allHosts
-        }
-      '';
+        ${concatMapStrings createTracProject config.trac.projects}
+      ''));
+
 
     };
 
