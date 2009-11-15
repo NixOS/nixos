@@ -98,6 +98,7 @@
   ./services/web-servers/apache-httpd/subversion.nix
   ./services/web-servers/apache-httpd/trac.nix
   ./services/web-servers/apache-httpd/twiki.nix
+  ./services/web-servers/apache-httpd/zabbix.nix
   ./services/web-servers/jboss.nix
   ./services/web-servers/tomcat.nix
   ./services/x11/desktop-managers/default.nix
