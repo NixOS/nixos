@@ -57,8 +57,9 @@
   ./services/misc/rogue.nix
   ./services/misc/synergy.nix
   ./services/monitoring/nagios/default.nix
-  ./services/monitoring/zabbix-agent.nix
-  ./services/monitoring/zabbix-server.nix
+  ./services/monitoring/zabbix/agent.nix
+  ./services/monitoring/zabbix/server.nix
+  ./services/monitoring/zabbix/interface.nix
   ./services/network-filesystems/nfs-kernel.nix
   ./services/network-filesystems/samba.nix
   ./services/networking/avahi-daemon.nix
@@ -99,7 +100,6 @@
   ./services/web-servers/apache-httpd/tomcat-connector.nix
   ./services/web-servers/apache-httpd/trac.nix
   ./services/web-servers/apache-httpd/twiki.nix
-  ./services/web-servers/apache-httpd/zabbix.nix
   ./services/web-servers/jboss.nix
   ./services/web-servers/tomcat.nix
   ./services/x11/desktop-managers/default.nix
