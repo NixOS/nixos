@@ -33,6 +33,8 @@ with pkgs.lib;
 
     services.dbus.packages = [ pkgs.udisks ];
 
+    services.udev.packages = [ pkgs.udisks ];
+
   };
 
 }
