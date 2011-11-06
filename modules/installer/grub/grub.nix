@@ -157,8 +157,56 @@ in
         '';
       };
 
-    };
+      efi = {
+        enable = mkOption {
+          default = false;
+          example = true;
+          description = "Whether to enable efi booting";
+          type = pkgs.lib.types.bool;
+        };
 
+        systemPartition = mkOption {
+          default = "/dev/sda1";
+          description = "The EFI system partition";
+          type = pkgs.lib.types.string;
+        };
+
+        bootFileDirectoryRoot = mkOption {
+          default = "/efi";
+          description = ''
+            The root directory on the EFI system partition where
+            bootloaders, kernels, and initrds will be stored.
+          '';
+          type = pkgs.lib.types.string;
+        };
+
+        vbiosDump = mkOption {
+          default = null;
+          example = ./vbios.bin;
+          description = ''
+            The vbios memory dump. Generatable by
+              'dd if=/dev/mem of=./vbios.bin bs=65536 skip=12 count=1'
+            when booted into BIOS emulation mode.
+          '';
+          type = pkgs.lib.types.nullOr pkgs.lib.types.string;
+        };
+
+        int10Dump = mkOption {
+          default = null;
+          example = ./int10.bin;
+          description = ''
+            The int10 memory dump. Generatable by
+              'dd if=/dev/mem of=./int10.bin bs=4 skip=16 count=1'
+            when booted into BIOS emulation mode.
+          '';
+          type =
+            if config.boot.loader.grub.efi.vbiosDump == null then
+              pkgs.lib.types.none (pkgs.lib.types.nullOr pkgs.lib.types.string)
+            else
+              pkgs.lib.types.nullOr pkgs.lib.types.string;
+        };
+      };
+    };
   };
 
 
