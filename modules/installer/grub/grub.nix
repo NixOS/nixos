@@ -184,6 +184,14 @@ in
           type = pkgs.lib.types.string;
         };
 
+        fakebios = mkOption {
+          default = false;
+          description = ''
+            Whether to have grub fake some BIOS memory structures
+          '';
+          type = pkgs.lib.types.bool;
+        };
+
         vbiosDump = mkOption {
           default = null;
           example = ./vbios.bin;
