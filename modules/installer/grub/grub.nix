@@ -162,7 +162,11 @@ in
           default = false;
           example = true;
           description = "Whether to enable efi booting";
-          type = pkgs.lib.types.bool;
+          type =
+            if config.boot.loader.grub.version == 2 then
+              pkgs.lib.types.bool
+            else
+              pkgs.lib.types.none pkgs.lib.types.bool;
         };
 
         systemPartition = mkOption {
@@ -221,7 +225,9 @@ in
     system.boot.loader.id = "grub";
     system.boot.loader.kernelFile = pkgs.stdenv.platform.kernelTarget;
 
-    environment.systemPackages = mkIf config.boot.loader.grub.enable [ grub ];
+    environment.systemPackages = 
+      (pkgs.lib.optional config.boot.loader.grub.enable grub) ++
+      (pkgs.lib.optional config.boot.loader.grub.efi.enable pkgs.efibootmgr);
 
     system.build.grub = grub;
 
