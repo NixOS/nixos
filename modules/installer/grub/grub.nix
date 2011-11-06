@@ -6,8 +6,8 @@ let
 
   grub = if config.boot.loader.grub.version == 1 then pkgs.grub else pkgs.grub2;
 
-  grubMenuBuilder = pkgs.substituteAll {
-    src = ./grub-menu-builder.sh;
+  grubBiosMenuBuilder = pkgs.substituteAll {
+    src = ./grub-bios-menu-builder.sh;
     isExecutable = true;
     inherit grub;
     inherit (pkgs) bash;
@@ -226,7 +226,7 @@ in
 
   config = mkIf config.boot.loader.grub.enable {
 
-    system.build.menuBuilder = grubMenuBuilder;
+    system.build.menuBuilder = grubBiosMenuBuilder;
 
     # Common attribute for boot loaders so only one of them can be
     # set at once.
