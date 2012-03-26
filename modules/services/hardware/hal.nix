@@ -84,7 +84,6 @@ in
                 "${pkgs.dbus_tools}/bin"
                 "${pkgs.procps}/bin"
                 "${pkgs.procps}/sbin"
-                "${config.system.sbin.modprobe}/sbin"
                 "${pkgs.module_init_tools}/bin"
                 "${pkgs.module_init_tools}/sbin"
                 "${pkgs.kbd}/bin"

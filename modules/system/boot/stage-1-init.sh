@@ -118,6 +118,8 @@ done
 
 
 # Load the required kernel modules.
+mkdir /lib
+ln -s @modulesClosure@/lib/modules /lib/modules
 echo @extraUtils@/bin/modprobe > /proc/sys/kernel/modprobe
 for i in @kernelModules@; do
     echo "loading module $(basename $i)..."

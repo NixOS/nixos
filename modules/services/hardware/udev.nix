@@ -47,7 +47,7 @@ let
       # Fix some paths in the standard udev rules.  Hacky.
       for i in $out/*.rules; do
         substituteInPlace $i \
-          --replace \"/sbin/modprobe \"${config.system.sbin.modprobe}/sbin/modprobe \
+          --replace \"/sbin/modprobe \"${pkgs.module_init_tools}/sbin/modprobe \
           --replace \"/sbin/mdadm \"${pkgs.mdadm}/sbin/mdadm \
           --replace \"/sbin/blkid \"${pkgs.utillinux}/sbin/blkid \
           --replace \"/bin/mount \"${pkgs.utillinux}/bin/mount
@@ -239,7 +239,7 @@ in
             # the modules may call upon udev's firmware loading rule.
             for i in ${toString config.boot.kernelModules}; do
                 echo "loading kernel module ‘$i’..."
-                ${config.system.sbin.modprobe}/sbin/modprobe $i || true
+                ${pkgs.module_init_tools}/sbin/modprobe $i || true
             done
           '';
       };

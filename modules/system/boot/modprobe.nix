@@ -8,34 +8,6 @@ with pkgs.lib;
 
   options = {
 
-    system.sbin.modprobe = mkOption {
-      # should be moved in module-init-tools
-      internal = true;
-      default = pkgs.writeTextFile {
-        name = "modprobe";
-        destination = "/sbin/modprobe";
-        executable = true;
-        text =
-          ''
-            #! ${pkgs.stdenv.shell}
-            export MODULE_DIR=${config.system.modulesTree}/lib/modules/
-
-            # Fall back to the kernel modules used at boot time if the
-            # modules in the current configuration don't match the
-            # running kernel.
-            if [ ! -d "$MODULE_DIR/$(${pkgs.coreutils}/bin/uname -r)" ]; then
-                MODULE_DIR=/var/run/booted-system/kernel-modules/lib/modules/
-            fi
-
-            exec ${pkgs.module_init_tools}/sbin/modprobe "$@"
-          '';
-      };
-      description = ''
-        Wrapper around modprobe that sets the path to the modules
-        tree.
-      '';
-    };
-
     boot.blacklistedKernelModules = mkOption {
       default = [];
       example = [ "cirrusfb" "i2c_piix4" ];
@@ -94,19 +66,20 @@ with pkgs.lib;
       ];
 
     system.activationScripts.modprobe =
+      # TODO: cleanup old symlinks
+      let
+        version = config.boot.kernelPackages.kernel.modDirVersion;
+        inherit (config.system) modulesTree;
+        src = "${modulesTree}${dest}";
+        dest = "/lib/modules/${version}";
+      in
       ''
-        # Allow the kernel to find our wrapped modprobe (which searches
-        # in the right location in the Nix store for kernel modules).
-        # We need this when the kernel (or some module) auto-loads a
-        # module.
-        echo ${config.system.sbin.modprobe}/sbin/modprobe > /proc/sys/kernel/modprobe
+        mkdir -p /lib/modules
+        ln -sfn ${src} ${dest}.tmp
+        mv -T -f ${dest}.tmp ${dest}
+        ls -l ${dest}
+        echo ${pkgs.kmod}/sbin/modprobe > /proc/sys/kernel/modprobe
       '';
-
-    environment.shellInit =
-      ''
-        export MODULE_DIR=${config.system.modulesTree}/lib/modules/
-      '';    
-
   };
 
 }

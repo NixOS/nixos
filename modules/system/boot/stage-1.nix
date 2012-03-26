@@ -107,13 +107,12 @@ let
 
 
   kernelPackages = config.boot.kernelPackages;
-  modulesTree = config.system.modulesTree;
 
 
   # Determine the set of modules that we need to mount the root FS.
   modulesClosure = pkgs.makeModulesClosure {
     rootModules = config.boot.initrd.availableKernelModules ++ config.boot.initrd.kernelModules;
-    kernel = modulesTree;
+    inherit (config.system) modulesTree;
     allowMissing = true;
   };
 
@@ -179,7 +178,8 @@ let
       ln -sv bash $out/bin/sh
 
       # Copy modprobe.
-      cp -v ${pkgs.module_init_tools}/sbin/modprobe $out/bin/modprobe.real
+      cp -v ${pkgs.kmod}/bin/kmod $out/bin/modprobe
+      cp -v ${pkgs.kmod}/lib/libkmod.so.* $out/lib
 
       # Maybe copy splashutils.
       ${optionalString enableSplashScreen ''
@@ -200,14 +200,6 @@ let
               fi
           fi
       done
-
-      # Make the modprobe wrapper that sets $MODULE_DIR.
-      cat > $out/bin/modprobe <<EOF
-      #! $out/bin/bash
-      export MODULE_DIR=${modulesClosure}/lib/modules
-      exec $out/bin/modprobe.real "\$@"
-      EOF
-      chmod u+x $out/bin/modprobe
 
       # Make sure that the patchelf'ed binaries still work.
       echo "testing patched programs..."
@@ -295,7 +287,7 @@ let
 
     isExecutable = true;
 
-    inherit udevConf extraUtils;
+    inherit udevConf extraUtils modulesClosure;
 
     inherit (config.boot) resumeDevice devSize runSize;
 
