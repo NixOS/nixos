@@ -179,7 +179,11 @@ let
       ln -sv bash $out/bin/sh
 
       # Copy modprobe.
-      cp -v ${pkgs.module_init_tools}/sbin/modprobe $out/bin/modprobe.real
+      cp -v ${pkgs.xz}/lib/liblzma.so.5 $out/lib
+      cp -v ${pkgs.zlib}/lib/libz.so* $out/lib
+      cp -v ${pkgs.kmod}/lib/libkmod* $out/lib
+      cp -v ${pkgs.kmod}/sbin/kmod $out/bin
+      cp -v ${pkgs.kmod}/sbin/modprobe $out/bin/modprobe.real
 
       # Maybe copy splashutils.
       ${optionalString enableSplashScreen ''
@@ -205,7 +209,7 @@ let
       cat > $out/bin/modprobe <<EOF
       #! $out/bin/bash
       export MODULE_DIR=${modulesClosure}/lib/modules
-      exec $out/bin/modprobe.real "\$@"
+      exec -a modprobe $out/bin/modprobe.real "\$@"
       EOF
       chmod u+x $out/bin/modprobe
 
