@@ -35,6 +35,9 @@ let
       # Ethernet cards used for bridging.  Likewise for vif* and tap*
       # (Xen) and virbr* and vnet* (libvirt).
       denyinterfaces ${toString ignoredInterfaces} peth* vif* tap* tun* virbr* vnet* vboxnet*
+      ${optionalString config.networking.dhcpcd.ignoreDNS ''
+        nohook resolv.conf
+      ''}
     '';
 
   # Hook for emitting ip-up/ip-down events.
@@ -82,6 +85,15 @@ in
          any of the shell glob patterns in this list. The purpose of
          this option is blacklist virtual interfaces such as those
          created by Xen, libvirt, LXC, etc.
+      '';
+    };
+
+    networking.dhcpcd.ignoreDNS = mkOption {
+      default = false;
+      description = ''
+        Configure dhcpcd so that it does not overwrite
+        /etc/resolv.conf. This option is useful if you wish to set
+        custom DNS servers in a GUI such as wicd.
       '';
     };
 
